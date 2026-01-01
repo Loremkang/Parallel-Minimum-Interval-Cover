@@ -4,6 +4,7 @@ worktrees/
 
 # Build directories
 build/
+build_*/
 bin/
 lib/
 
@@ -20,11 +21,26 @@ Makefile
 *.dylib
 *.exe
 
+# Executables (test/debug/benchmark binaries)
+test_interval_covering
+test_sample_duplicates
+test_simple_scan
+test_benchmark_flow
+debug_scan_hang
+debug_scan_hang_O3
+debug_scan_hang_full
+benchmark_interval_covering
+benchmark_parallel_breakdown
+benchmark_thread_scaling
+
 # Test and benchmark outputs
 test_output/
 benchmark_results/
+results/
+plots/
 *.png
 *.pdf
+*.svg
 *.csv
 
 # IDE files
@@ -33,6 +49,9 @@ benchmark_results/
 *.swp
 *.swo
 *~
+
+# Claude Code
+.claude/
 
 # OS files
 .DS_Store
@@ -45,3 +64,4 @@ __pycache__/
 *.pyd
 .Python
 venv/
+*.egg-info/
