@@ -14,18 +14,45 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0 -DDEBUG")
 add_subdirectory(parlaylib EXCLUDE_FROM_ALL)
 
 # Include directories
-include_directories(${CMAKE_SOURCE_DIR})
+include_directories(${CMAKE_SOURCE_DIR}/include)
 include_directories(${CMAKE_SOURCE_DIR}/parlaylib/include)
 
-# Test executable - Always use Debug mode
-add_executable(test_interval_covering test_interval_covering.cpp)
+# Output binaries to build/bin
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+# Test executables - Always use Debug mode
+add_executable(test_interval_covering tests/test_interval_covering.cpp)
 target_link_libraries(test_interval_covering parlay)
 target_compile_options(test_interval_covering PRIVATE -g -O0)
 target_compile_definitions(test_interval_covering PRIVATE DEBUG)
 
+add_executable(test_sample_duplicates tests/test_sample_duplicates.cpp)
+target_link_libraries(test_sample_duplicates parlay)
+target_compile_options(test_sample_duplicates PRIVATE -g -O0)
+target_compile_definitions(test_sample_duplicates PRIVATE DEBUG)
+
+add_executable(test_simple_scan tests/test_simple_scan.cpp)
+target_link_libraries(test_simple_scan parlay)
+target_compile_options(test_simple_scan PRIVATE -g -O0)
+target_compile_definitions(test_simple_scan PRIVATE DEBUG)
+
+add_executable(debug_comparison tests/debug_comparison.cpp)
+target_link_libraries(debug_comparison parlay)
+target_compile_options(debug_comparison PRIVATE -g -O0)
+target_compile_definitions(debug_comparison PRIVATE DEBUG)
+
+add_executable(debug_scan_hang tests/debug_scan_hang.cpp)
+target_link_libraries(debug_scan_hang parlay)
+target_compile_options(debug_scan_hang PRIVATE -g -O0)
+target_compile_definitions(debug_scan_hang PRIVATE DEBUG)
+
 # Optional: enable pthread
 find_package(Threads REQUIRED)
 target_link_libraries(test_interval_covering Threads::Threads)
+target_link_libraries(test_sample_duplicates Threads::Threads)
+target_link_libraries(test_simple_scan Threads::Threads)
+target_link_libraries(debug_comparison Threads::Threads)
+target_link_libraries(debug_scan_hang Threads::Threads)
 
 # Add custom target for running tests
 add_custom_target(run_tests
@@ -34,9 +61,9 @@ add_custom_target(run_tests
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
-# Benchmark executable - Always use Release mode
-if(EXISTS "${CMAKE_SOURCE_DIR}/benchmark_interval_covering.cpp")
-    add_executable(benchmark_interval_covering benchmark_interval_covering.cpp)
+# Benchmark executables - Always use Release mode
+if(EXISTS "${CMAKE_SOURCE_DIR}/benchmarks/benchmark_interval_covering.cpp")
+    add_executable(benchmark_interval_covering benchmarks/benchmark_interval_covering.cpp)
     target_link_libraries(benchmark_interval_covering parlay)
     target_link_libraries(benchmark_interval_covering Threads::Threads)
     target_compile_options(benchmark_interval_covering PRIVATE -O3 -march=native)
@@ -49,9 +76,8 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/benchmark_interval_covering.cpp")
     )
 endif()
 
-# Thread scaling benchmark executable - Always use Release mode
-if(EXISTS "${CMAKE_SOURCE_DIR}/benchmark_thread_scaling.cpp")
-    add_executable(benchmark_thread_scaling benchmark_thread_scaling.cpp)
+if(EXISTS "${CMAKE_SOURCE_DIR}/benchmarks/benchmark_thread_scaling.cpp")
+    add_executable(benchmark_thread_scaling benchmarks/benchmark_thread_scaling.cpp)
     target_link_libraries(benchmark_thread_scaling parlay)
     target_link_libraries(benchmark_thread_scaling Threads::Threads)
     target_compile_options(benchmark_thread_scaling PRIVATE -O3 -march=native)
@@ -64,9 +90,8 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/benchmark_thread_scaling.cpp")
     )
 endif()
 
-# Parallel breakdown benchmark executable - Always use Release mode
-if(EXISTS "${CMAKE_SOURCE_DIR}/benchmark_parallel_breakdown.cpp")
-    add_executable(benchmark_parallel_breakdown benchmark_parallel_breakdown.cpp)
+if(EXISTS "${CMAKE_SOURCE_DIR}/benchmarks/benchmark_parallel_breakdown.cpp")
+    add_executable(benchmark_parallel_breakdown benchmarks/benchmark_parallel_breakdown.cpp)
     target_link_libraries(benchmark_parallel_breakdown parlay)
     target_link_libraries(benchmark_parallel_breakdown Threads::Threads)
     target_compile_options(benchmark_parallel_breakdown PRIVATE -O3 -march=native)
@@ -79,16 +104,3 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/benchmark_parallel_breakdown.cpp")
     )
 endif()
 
-# Bug demonstration executable
-if(EXISTS "${CMAKE_SOURCE_DIR}/demo_parallel_bug.cpp")
-    add_executable(demo_parallel_bug demo_parallel_bug.cpp)
-    target_link_libraries(demo_parallel_bug parlay)
-    target_link_libraries(demo_parallel_bug Threads::Threads)
-endif()
-
-# Debug comparison executable
-if(EXISTS "${CMAKE_SOURCE_DIR}/debug_comparison.cpp")
-    add_executable(debug_comparison debug_comparison.cpp)
-    target_link_libraries(debug_comparison parlay)
-    target_link_libraries(debug_comparison Threads::Threads)
-endif()
