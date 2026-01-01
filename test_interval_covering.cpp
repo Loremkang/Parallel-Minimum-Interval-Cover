@@ -15,7 +15,7 @@ void print_intervals(const std::vector<std::pair<T, T>>& intervals) {
 
 template <typename T>
 void print_result(const std::vector<std::pair<T, T>>& intervals,
-                  const std::vector<uint8_t>& valid) {
+                  const parlay::sequence<bool>& valid) {
   std::cout << "Minimum interval cover:\n";
   for (size_t i = 0; i < valid.size(); i++) {
     if (valid[i]) {
@@ -28,13 +28,13 @@ void print_result(const std::vector<std::pair<T, T>>& intervals,
 // Verify that the selected intervals form a valid cover
 template <typename T>
 bool verify_cover(const std::vector<std::pair<T, T>>& intervals,
-                  const std::vector<uint8_t>& valid, T target = 0) {
-  std::vector<size_t> selected;
-  for (size_t i = 0; i < valid.size(); i++) {
-    if (valid[i]) {
-      selected.push_back(i);
-    }
-  }
+                  const parlay::sequence<bool>& valid, T target = 0) {
+  parlay::sequence<size_t> selected = parlay::pack_index(valid);
+  // for (size_t i = 0; i < valid.size(); i++) {
+  //   if (valid[i]) {
+  //     selected.push_back(i);
+  //   }
+  // }
 
   if (selected.empty()) {
     std::cerr << "ERROR: No intervals selected\n";
@@ -63,9 +63,10 @@ bool verify_cover(const std::vector<std::pair<T, T>>& intervals,
 }
 
 // Test 1: Simple small case
+template <typename T>
 void test_simple() {
-  std::cout << "\n=== Test 1: Simple Case ===\n";
-  std::vector<std::pair<int, int>> intervals = {{0, 5},   {1, 8},   {3, 10},
+  std::cout << "\n=== Test 1: Simple Case (type " << typeid(T).name() << ") ===\n";
+  std::vector<std::pair<T, T>> intervals = {{0, 5},   {1, 8},   {3, 10},
                                                  {7, 15},  {12, 20}, {18, 25},
                                                  {22, 30}, {28, 35}};
 
@@ -92,9 +93,10 @@ void test_simple() {
 }
 
 // Test 2: Single interval
+template <typename T>
 void test_single_interval() {
-  std::cout << "\n=== Test 2: Single Interval ===\n";
-  std::vector<std::pair<int, int>> intervals = {{0, 10}};
+  std::cout << "\n=== Test 2: Single Interval (type " << typeid(T).name() << ") ===\n";
+  std::vector<std::pair<T, T>> intervals = {{0, 10}};
 
   auto getL = [&](size_t i) { return intervals[i].first; };
   auto getR = [&](size_t i) { return intervals[i].second; };
@@ -107,9 +109,10 @@ void test_single_interval() {
 }
 
 // Test 3: Two intervals
+template <typename T>
 void test_two_intervals() {
-  std::cout << "\n=== Test 3: Two Intervals ===\n";
-  std::vector<std::pair<int, int>> intervals = {{0, 5}, {3, 10}};
+  std::cout << "\n=== Test 3: Two Intervals (type " << typeid(T).name() << ") ===\n";
+  std::vector<std::pair<T, T>> intervals = {{0, 5}, {3, 10}};
 
   auto getL = [&](size_t i) { return intervals[i].first; };
   auto getR = [&](size_t i) { return intervals[i].second; };
@@ -123,10 +126,11 @@ void test_two_intervals() {
 }
 
 // Test 4: Adjacent intervals (touching but not overlapping)
+template <typename T>
 void test_non_overlapping() {
-  std::cout << "\n=== Test 4: Adjacent Intervals ===\n";
+  std::cout << "\n=== Test 4: Adjacent Intervals (type " << typeid(T).name() << ") ===\n";
   // Must satisfy L(i+1) <= R(i), so make them touch
-  std::vector<std::pair<int, int>> intervals = {
+  std::vector<std::pair<T, T>> intervals = {
       {0, 5}, {5, 10}, {10, 15}, {15, 20}};
 
   auto getL = [&](size_t i) { return intervals[i].first; };
@@ -146,10 +150,11 @@ void test_non_overlapping() {
 }
 
 // Test 5: Nested/Overlapping intervals with monotonic L and R
+template <typename T>
 void test_nested() {
-  std::cout << "\n=== Test 5: Nested/Overlapping Intervals ===\n";
+  std::cout << "\n=== Test 5: Nested/Overlapping Intervals (type " << typeid(T).name() << ") ===\n";
   // Must satisfy: L(i) < L(i+1) AND R(i) < R(i+1)
-  std::vector<std::pair<int, int>> intervals = {{0, 50}, {10, 60}, {15, 70},
+  std::vector<std::pair<T, T>> intervals = {{0, 50}, {10, 60}, {15, 70},
                                                  {30, 80}, {35, 90}};
 
   auto getL = [&](size_t i) { return intervals[i].first; };
@@ -165,10 +170,11 @@ void test_nested() {
 }
 
 // Test 6: Many overlapping intervals
+template <typename T>
 void test_many_overlapping() {
-  std::cout << "\n=== Test 6: Many Overlapping Intervals ===\n";
-  std::vector<std::pair<int, int>> intervals;
-  for (int i = 0; i < 50; i++) {
+  std::cout << "\n=== Test 6: Many Overlapping Intervals (type " << typeid(T).name() << ") ===\n";
+  std::vector<std::pair<T, T>> intervals;
+  for (T i = 0; i < 50; i++) {
     intervals.push_back({i * 2, i * 2 + 10});
   }
 
@@ -189,15 +195,16 @@ void test_many_overlapping() {
 }
 
 // Test 7: Large random test
+template <typename T>
 void test_large_random() {
-  std::cout << "\n=== Test 7: Large Random Test ===\n";
+  std::cout << "\n=== Test 7: Large Random Test (type " << typeid(T).name() << ") ===\n";
   const size_t n = 10000;
-  std::vector<std::pair<int, int>> intervals;
+  std::vector<std::pair<T, T>> intervals;
 
   // Generate random intervals with strict monotonicity
   // Must ensure L(i) < L(i+1) and R(i) < R(i+1)
-  int left = 0;
-  int right = 10;
+  T left = 0;
+  T right = 10;
   for (size_t i = 0; i < n; i++) {
     intervals.push_back({left, right});
     left += (rand() % 5) + 1;    // +1 ensures strict increase
@@ -221,10 +228,11 @@ void test_large_random() {
 }
 
 // Test 8: Edge case with very similar (nearly identical) intervals
+template <typename T>
 void test_identical_intervals() {
-  std::cout << "\n=== Test 8: Very Similar Intervals ===\n";
+  std::cout << "\n=== Test 8: Very Similar Intervals (type " << typeid(T).name() << ") ===\n";
   // Cannot have identical L or R values due to strict monotonicity requirement
-  std::vector<std::pair<int, int>> intervals = {
+  std::vector<std::pair<T, T>> intervals = {
       {0, 10}, {5, 15}, {6, 16}, {7, 17}, {10, 20}};
 
   auto getL = [&](size_t i) { return intervals[i].first; };
@@ -240,13 +248,14 @@ void test_identical_intervals() {
 }
 
 // Test 9: Very long chain
+template <typename T>
 void test_long_chain() {
-  std::cout << "\n=== Test 9: Long Chain ===\n";
+  std::cout << "\n=== Test 9: Long Chain (type " << typeid(T).name() << ") ===\n";
   const size_t n = 1000;
-  std::vector<std::pair<int, int>> intervals;
+  std::vector<std::pair<T, T>> intervals;
 
   for (size_t i = 0; i < n; i++) {
-    intervals.push_back({(int)i, (int)i + 2});
+    intervals.push_back({static_cast<T>(i), static_cast<T>(i + 2)});
   }
 
   auto getL = [&](size_t i) { return intervals[i].first; };
@@ -266,16 +275,17 @@ void test_long_chain() {
 }
 
 // Test 10: Stress test with various sizes
+template <typename T>
 void test_various_sizes() {
-  std::cout << "\n=== Test 10: Various Sizes ===\n";
+  std::cout << "\n=== Test 10: Various Sizes (type " << typeid(T).name() << ") ===\n";
 
-  std::vector<size_t> sizes = {1,   2,   3,    5,    10,   50,
+  parlay::sequence<size_t> sizes = {1,   2,   3,    5,    10,   50,
                                 100, 500, 1000, 5000, 10000};
 
   for (size_t n : sizes) {
-    std::vector<std::pair<int, int>> intervals;
-    int left = 0;
-    int right = 5;
+    std::vector<std::pair<T, T>> intervals;
+    T left = 0;
+    T right = 5;
 
     for (size_t i = 0; i < n; i++) {
       intervals.push_back({left, right});
@@ -299,21 +309,30 @@ void test_various_sizes() {
   std::cout << "PASSED\n";
 }
 
+template <typename T>
+void run_all_tests() {
+  test_simple<T>();
+  test_single_interval<T>();
+  test_two_intervals<T>();
+  test_non_overlapping<T>();
+  test_nested<T>();
+  test_many_overlapping<T>();
+  test_large_random<T>();
+  test_identical_intervals<T>();
+  test_long_chain<T>();
+  test_various_sizes<T>();
+}
+
 int main() {
   std::cout << "Running Interval Covering Tests\n";
   std::cout << "================================\n";
 
   try {
-    test_simple();
-    test_single_interval();
-    test_two_intervals();
-    test_non_overlapping();
-    test_nested();
-    test_many_overlapping();
-    test_large_random();
-    test_identical_intervals();
-    test_long_chain();
-    test_various_sizes();
+    std::cout << "\n### Testing with type: int ###\n";
+    run_all_tests<int>();
+
+    std::cout << "\n### Testing with type: int64_t ###\n";
+    run_all_tests<int64_t>();
 
     std::cout << "\n================================\n";
     std::cout << "ALL TESTS PASSED!\n";

@@ -15,15 +15,22 @@
 template<typename GetL, typename GetR>
 class IntervalCovering {
  public:
+  // Deduce endpoint type T from GetL's return type
+  using T = std::remove_cv_t<std::remove_reference_t<decltype(std::declval<GetL>()(size_t(0)))>>;
+
+  // Deduce GetR's return type for comparison
+  using T_GetR = std::remove_cv_t<std::remove_reference_t<decltype(std::declval<GetR>()(size_t(0)))>>;
+
+  // Static assertion to ensure GetL and GetR return the same type
+  static_assert(std::is_same<T, T_GetR>::value,
+                "GetL and GetR must return the same type");
+
   // Constructor
   IntervalCovering(size_t n, GetL L, GetR R)
       : n(n), L(L), R(R), furthest_id(n) {}
 
-  struct LinkListNode {
-    size_t nxt : 62;      // Next pointer (62 bits)
-    size_t sampled : 1;   // Sampled flag (1 bit)
-    size_t valid : 1;     // Valid flag (1 bit)
-
+  class LinkListNode {
+    public:
     LinkListNode(bool valid = false, size_t nxt = kNullPtr, bool sampled = false)
         : nxt(nxt), sampled(sampled), valid(valid) {}
 
@@ -34,8 +41,18 @@ class IntervalCovering {
     void set_sampled(bool s) { sampled = s; }
 
     size_t get_nxt() const { return nxt; }
-    void set_nxt(size_t n) { nxt = n; }
+    void set_nxt(size_t n) { 
+      assert(n <= kNullPtr);
+      nxt = n;
+    }
+
+  private:
+    size_t nxt;      // Next pointer (62 bits)
+    bool sampled;   // Sampled flag (1 bit)
+    bool valid;     // Valid flag (1 bit)
   };
+  
+  static constexpr size_t kNullPtr = (1ULL << 62) - 1;
 
   size_t l_nodeid(size_t i) const { return i * 2; }
   size_t r_nodeid(size_t i) const { return i * 2 + 1; }
@@ -55,7 +72,7 @@ class IntervalCovering {
 
   void FindFurthestSerial(size_t s, size_t e) {
     // Binary search for the first segment
-    size_t r_of_s = R(s);
+    T r_of_s = R(s);
     size_t l = s;
     size_t r = n;
     while (l + 1 < r) {
@@ -71,7 +88,7 @@ class IntervalCovering {
     // Process remaining segments using monotonicity
     for (size_t j = s + 1; j < e; j++) {
       size_t rid = furthest_id[j - 1];
-      size_t r_of_j = R(j);
+      T r_of_j = R(j);
       while (rid < n && L(rid) <= r_of_j) {
         rid++;
       }
@@ -92,12 +109,12 @@ class IntervalCovering {
 
     DEBUG_ONLY {
       // Save parallel results
-      std::vector<size_t> furthest_id_parallel(n);
+      parlay::sequence<size_t> furthest_id_parallel(n);
       parlay::parallel_for(
           0, n, [&](size_t i) { furthest_id_parallel[i] = furthest_id[i]; });
 
       // Run serial version on a copy to verify
-      std::vector<size_t> furthest_id_serial(n);
+      parlay::sequence<size_t> furthest_id_serial(n);
       std::swap(furthest_id, furthest_id_serial);
       FindFurthestSerial(0, n);
 
@@ -113,7 +130,7 @@ class IntervalCovering {
 
   // Build the link list for the euler tour
   void BuildLinkList() {
-    link_list = std::vector<LinkListNode>(n * 2);
+    link_list = parlay::sequence<LinkListNode>(n * 2, LinkListNode());
 
     r_node(0).set_valid(true);
     parlay::parallel_for(0, n - 1, [&](size_t i) {
@@ -181,9 +198,9 @@ class IntervalCovering {
     size_t node_id = l_nodeid(n - 1);
     bool valid = false;
     while (node_id != kNullPtr) {
-      valid = valid || link_list[node_id].valid;
-      link_list[node_id].valid = valid;
-      node_id = link_list[node_id].nxt;
+      valid = valid || link_list[node_id].get_valid();
+      link_list[node_id].set_valid(valid);
+      node_id = link_list[node_id].get_nxt();
     }
   }
 
@@ -192,69 +209,107 @@ class IntervalCovering {
     size_t nn = n * 2;
     parlay::random rnd(0);
 
-    size_t total_sampled = 1 + (nn + parallel_block_size - 1) / parallel_block_size;
-    sampled_id.resize(total_sampled);
-    sampled_id[0] = l_nodeid(n - 1);
-    link_list[sampled_id[0]].set_sampled(true);
-    for (size_t i = 1; i < total_sampled; i ++) {
-      sampled_id[i] = rnd.ith_rand(i) % nn;
-      link_list[sampled_id[i]].set_sampled(true);
+    size_t total_sampled_max = 1 + (nn + parallel_block_size - 1) / parallel_block_size;
+    sampled_id.resize(total_sampled_max);
+    size_t actual_sampled = 0;
+
+    auto sample = [&](size_t node_id) {
+      if (link_list[node_id].get_sampled()) return;
+      assert(actual_sampled < total_sampled_max);
+      link_list[node_id].set_sampled(true);
+      sampled_id[actual_sampled++] = node_id;
+    };
+
+    sample(l_nodeid(n - 1));  // always sample the start node
+    for (size_t i = 1; i < total_sampled_max; i ++) {
+      size_t node_id = rnd.ith_rand(i) % nn;
+      sample(node_id);
     }
+    sampled_id.resize(actual_sampled); 
   }
 
-  void ScanLinkListParallel(size_t segment_count = parallel_block_size) {
-    (void)segment_count;  // Parameter not used yet
+  void ScanLinkListParallel() {
     BuildSampleId();
     
     // scan from each sampled node until next sampled node
-    sampled_id_nxt.resize(sampled_id.size());
+    sampled_id_nxt_initial.resize(sampled_id.size());
     parlay::parallel_for(0, sampled_id.size(), [&](size_t i) {
-      size_t node_id = sampled_id[i];
-      bool valid = false;
+      // save the initial nxt for sampled nodes
+      sampled_id_nxt_initial[i] = link_list[sampled_id[i]].get_nxt();
+
+      size_t start_id = sampled_id[i];
+      bool valid = link_list[start_id].get_valid();
+      size_t node_id = link_list[start_id].get_nxt();
       while (node_id != kNullPtr) {
-        valid = valid || link_list[node_id].valid;
-        link_list[node_id].valid = valid;
+        valid = valid || link_list[node_id].get_valid();
+        link_list[node_id].set_valid(valid);
         if (link_list[node_id].get_sampled()) {
           break;
         }
-        node_id = link_list[node_id].nxt;
+        node_id = link_list[node_id].get_nxt();
       }
-      sampled_id_nxt[i] = node_id;
-    });
+
+      // link sampled nodes together
+      link(sampled_id[i], node_id);
+    }, 1);
 
     // scan over sampled sketch
     {
       size_t node_id = sampled_id[0];
       bool valid = false;
       while (node_id != kNullPtr) {
-        valid = valid || link_list[node_id].valid;
-        link_list[node_id].valid = valid;
-        node_id = link_list[node_id].nxt;
+        valid = valid || link_list[node_id].get_valid();
+        link_list[node_id].set_valid(valid);
+        node_id = link_list[node_id].get_nxt();
       }
     }
 
-    // scan from each sampled node until next sampled node
+
+    // FIX: Separate restore and scan into two phases to avoid data race
+
+    // Phase 1: Restore all links first
+    // parlay::parallel_for(0, sampled_id.size(), [&](size_t i) {
+    //   link(sampled_id[i], sampled_id_nxt_initial[i]);
+    // }, 1);
+
+    // Phase 2: Then scan from each sampled node
     parlay::parallel_for(0, sampled_id.size(), [&](size_t i) {
-      size_t node_id = sampled_id[i];
-      bool valid = false;
+      size_t start_id = sampled_id[i];
+      bool valid = link_list[start_id].get_valid();
+      link(start_id, sampled_id_nxt_initial[i]);  // Restore link
+
+      size_t node_id = sampled_id_nxt_initial[i];
       while (node_id != kNullPtr) {
-        valid = valid || link_list[node_id].valid;
-        link_list[node_id].valid = valid;
+        valid = valid || link_list[node_id].get_valid();
+        link_list[node_id].set_valid(valid);
         if (link_list[node_id].get_sampled()) {
           break;
         }
-        node_id = link_list[node_id].nxt;
+        node_id = link_list[node_id].get_nxt();
       }
-      sampled_id_nxt[i] = node_id;
-    });
+    }, 1);
   }
 
-  void ScanLinkList() {
+  void PrintIntervals() {
+    for (size_t i = 0; i < n; i++) {
+      std::cout << "Interval " << i << ": [" << L(i) << ", " << R(i) << "]\n";
+    }
+  }
+
+  void PrintLinkList() {
+    size_t nodeid = l_nodeid(n - 1);
+    while (nodeid != kNullPtr) {
+      std::cout << node_str(nodeid) << " (valid=" << link_list[nodeid].get_valid() << ")\n";
+      nodeid = link_list[nodeid].get_nxt();
+    }
+  }
+
+   void ScanLinkList() {
     DEBUG_ONLY {
       size_t nn = n * 2;
 
       // Save the original link_list valid flags
-      std::vector<uint8_t> saved_valid(nn);
+      parlay::sequence<bool> saved_valid(nn);
       parlay::parallel_for(
           0, nn, [&](size_t i) { saved_valid[i] = link_list[i].get_valid(); });
 
@@ -278,6 +333,8 @@ class IntervalCovering {
         if (link_list[i].get_valid() != parallel_valid[i]) {
           printf("ScanLinkList mismatch at %ld: serial=%d, parallel=%d\n", i,
                  link_list[i].get_valid(), parallel_valid[i]);
+          PrintLinkList();
+          PrintIntervals();
           assert(false);
         }
       });
@@ -318,11 +375,11 @@ class IntervalCovering {
 
     DEBUG_ONLY {
       // Save parallel results
-      parlay::sequence<uint8_t> valid_parallel(n);
+      parlay::sequence<bool> valid_parallel(n, false);
       parlay::parallel_for(0, n, [&](size_t i) { valid_parallel[i] = valid[i]; });
 
       // Reset valid
-      memset(valid.data(), 0, n * sizeof(uint8_t));
+      memset(valid.data(), 0, n * sizeof(bool));
 
       // Run serial version
       KernelSerial();
@@ -343,7 +400,7 @@ class IntervalCovering {
       return;
     }
 
-    valid = std::vector<uint8_t>(n, 0);
+    valid = parlay::sequence<bool>(n, 0);
     
     DEBUG_ONLY {
       // L(i) < L(i+1) and R(i) < R(i+1)
@@ -367,16 +424,15 @@ class IntervalCovering {
 
   static constexpr size_t parallel_block_size = parlay::internal::_block_size;
   // kNullPtr must fit in 62 bits (LinkListNode.nxt is 62 bits)
-  static constexpr size_t kNullPtr = (1ULL << 62) - 1;
 
   size_t n;
   GetL L;
   GetR R;
 
-  std::vector<LinkListNode> link_list;
-  std::vector<uint8_t> valid;
-  std::vector<size_t> furthest_id;
-  std::vector<size_t> sampled_id, sampled_id_nxt;
+  parlay::sequence<LinkListNode> link_list;
+  parlay::sequence<bool> valid;
+  parlay::sequence<size_t> furthest_id;
+  parlay::sequence<size_t> sampled_id, sampled_id_nxt_initial;
 };
 
 #endif

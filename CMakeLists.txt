@@ -17,9 +17,11 @@ add_subdirectory(parlaylib EXCLUDE_FROM_ALL)
 include_directories(${CMAKE_SOURCE_DIR})
 include_directories(${CMAKE_SOURCE_DIR}/parlaylib/include)
 
-# Test executable
+# Test executable - Always use Debug mode
 add_executable(test_interval_covering test_interval_covering.cpp)
 target_link_libraries(test_interval_covering parlay)
+target_compile_options(test_interval_covering PRIVATE -g -O0)
+target_compile_definitions(test_interval_covering PRIVATE DEBUG)
 
 # Optional: enable pthread
 find_package(Threads REQUIRED)
@@ -32,11 +34,13 @@ add_custom_target(run_tests
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
-# Benchmark executable
+# Benchmark executable - Always use Release mode
 if(EXISTS "${CMAKE_SOURCE_DIR}/benchmark_interval_covering.cpp")
     add_executable(benchmark_interval_covering benchmark_interval_covering.cpp)
     target_link_libraries(benchmark_interval_covering parlay)
     target_link_libraries(benchmark_interval_covering Threads::Threads)
+    target_compile_options(benchmark_interval_covering PRIVATE -O3 -march=native)
+    target_compile_definitions(benchmark_interval_covering PRIVATE NDEBUG)
 
     add_custom_target(run_benchmark
         COMMAND benchmark_interval_covering
@@ -45,15 +49,32 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/benchmark_interval_covering.cpp")
     )
 endif()
 
-# Thread scaling benchmark executable
+# Thread scaling benchmark executable - Always use Release mode
 if(EXISTS "${CMAKE_SOURCE_DIR}/benchmark_thread_scaling.cpp")
     add_executable(benchmark_thread_scaling benchmark_thread_scaling.cpp)
     target_link_libraries(benchmark_thread_scaling parlay)
     target_link_libraries(benchmark_thread_scaling Threads::Threads)
+    target_compile_options(benchmark_thread_scaling PRIVATE -O3 -march=native)
+    target_compile_definitions(benchmark_thread_scaling PRIVATE NDEBUG)
 
     add_custom_target(run_thread_scaling
         COMMAND benchmark_thread_scaling
         DEPENDS benchmark_thread_scaling
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+endif()
+
+# Parallel breakdown benchmark executable - Always use Release mode
+if(EXISTS "${CMAKE_SOURCE_DIR}/benchmark_parallel_breakdown.cpp")
+    add_executable(benchmark_parallel_breakdown benchmark_parallel_breakdown.cpp)
+    target_link_libraries(benchmark_parallel_breakdown parlay)
+    target_link_libraries(benchmark_parallel_breakdown Threads::Threads)
+    target_compile_options(benchmark_parallel_breakdown PRIVATE -O3 -march=native)
+    target_compile_definitions(benchmark_parallel_breakdown PRIVATE NDEBUG)
+
+    add_custom_target(run_breakdown
+        COMMAND benchmark_parallel_breakdown
+        DEPENDS benchmark_parallel_breakdown
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     )
 endif()

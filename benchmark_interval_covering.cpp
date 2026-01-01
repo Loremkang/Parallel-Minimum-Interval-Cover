@@ -19,22 +19,19 @@ struct BenchmarkResult {
 };
 
 // Generate test data with strict monotonicity
-std::vector<std::pair<int, int>> generate_intervals(size_t n, int seed = 42) {
+// Using int as the endpoint type for benchmarking
+parlay::sequence<std::pair<int, int>> generate_intervals(size_t n, int seed = 42) {
   std::mt19937 rng(seed);
-  std::uniform_int_distribution<int> step_dist(1, 10);
-  std::uniform_int_distribution<int> len_dist(5, 20);
+  std::uniform_int_distribution<size_t> step_dist(1, 10);
+  std::uniform_int_distribution<size_t> len_dist(5, 20);
 
-  std::vector<std::pair<int, int>> intervals;
-  intervals.reserve(n);
+  parlay::sequence<size_t> lefts = parlay::tabulate(n, [&](size_t) { return step_dist(rng); });
+  parlay::scan_inplace(lefts);
+  parlay::sequence<size_t> rights = parlay::tabulate(n, [&](size_t i) { return lefts[i] + len_dist(rng); });
 
-  int left = 0;
-  int right = len_dist(rng);
-
-  for (size_t i = 0; i < n; i++) {
-    intervals.push_back({left, right});
-    left += step_dist(rng);
-    right = left + len_dist(rng);
-  }
+  parlay::sequence<std::pair<int, int>> intervals = parlay::tabulate(n, [&](size_t i) {
+    return std::make_pair(static_cast<int>(lefts[i]), static_cast<int>(rights[i]));
+  });
 
   return intervals;
 }
@@ -51,7 +48,7 @@ BenchmarkResult run_benchmark(size_t n) {
   // Test Serial Version
   {
     IntervalCovering solver(intervals.size(), getL, getR);
-    solver.valid = std::vector<uint8_t>(n, 0);
+    solver.valid = parlay::sequence<bool>(n, 0);
 
     auto start = high_resolution_clock::now();
     solver.KernelSerial();
@@ -99,11 +96,11 @@ int main() {
   std::cout << "========================================\n\n";
 
   // Test sizes
-  std::vector<size_t> sizes = {1000,   2000,    5000,    10000,   20000,
+  parlay::sequence<size_t> sizes = {1000,   2000,    5000,    10000,   20000,
                                 50000,  100000,  200000,  500000,  1000000,
                                 2000000, 5000000, 10000000};
 
-  std::vector<BenchmarkResult> results;
+  parlay::sequence<BenchmarkResult> results;
 
   std::cout << std::setw(12) << "N" << std::setw(12) << "Serial(ms)"
             << std::setw(12) << "Parallel(ms)" << std::setw(12) << "Speedup"

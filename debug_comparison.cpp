@@ -4,6 +4,7 @@
 #include <vector>
 
 // Same generation as benchmark
+// Using int as the endpoint type
 std::vector<std::pair<int, int>> generate_intervals(size_t n, int seed = 42) {
   std::mt19937 rng(seed);
   std::uniform_int_distribution<int> step_dist(1, 10);
@@ -38,10 +39,10 @@ int main() {
   auto getR = [&](size_t i) { return intervals[i].second; };
 
   // Test Serial
-  std::vector<size_t> serial_selected;
+  parlay::sequence<size_t> serial_selected;
   {
     IntervalCovering solver(intervals.size(), getL, getR);
-    solver.valid = std::vector<uint8_t>(n, 0);
+    solver.valid = parlay::sequence<bool>(n, 0);
     solver.KernelSerial();
     for (size_t i = 0; i < n; i++) {
       if (solver.valid[i]) {

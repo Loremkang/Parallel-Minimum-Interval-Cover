@@ -176,6 +176,53 @@ The serial algorithm demonstrates **excellent linear scaling** from 1K to 10M in
 - ✅ **Critical lesson**: Simple serial algorithms can decisively beat complex parallel ones
 - ✅ Compiler optimizations matter: 9-20× performance improvement from Debug to Release
 
+### 9. Parallel Algorithm Breakdown Analysis ✅
+- Created `benchmark_parallel_breakdown.cpp` to measure each phase of KernelParallel
+- Modified to use existing `IntervalCovering` class methods instead of reimplementing
+- Analyzes 4 phases: FindFurthest, BuildLinkList, ScanLinkList, ExtractValid
+- Created `plot_breakdown.py` to generate 4 breakdown visualizations
+- Tested with 1, 2, 4, 8, 16, and 32 threads for input sizes from 10K to 10M intervals
+
+### Breakdown Analysis Results (10M intervals)
+
+#### Phase Timing (1 thread):
+| Phase | Time (ms) | % of Total |
+|-------|-----------|------------|
+| FindFurthest | 75.20 | 20.5% |
+| **BuildLinkList** | **190.75** | **52.1%** |
+| ScanLinkList | 80.47 | 22.0% |
+| ExtractValid | 19.81 | 5.4% |
+| **Total** | **366.23** | **100%** |
+
+#### Phase Scaling (1 → 4 threads):
+| Phase | Speedup | Efficiency |
+|-------|---------|------------|
+| FindFurthest | 3.51× | 87.7% |
+| **BuildLinkList** | **1.41×** | **35.2%** |
+| **ScanLinkList** | **1.01×** | **25.2%** |
+| ExtractValid | 2.65× | 66.3% |
+| **Overall** | **1.50×** | **37.5%** |
+
+#### Key Findings:
+1. **Primary Bottleneck: BuildLinkList**
+   - Consumes 52.1% of execution time
+   - Poorest scaling: only 1.41× speedup with 4 threads
+   - Remains bottleneck even with more threads (55.5% at 4 threads)
+
+2. **Secondary Bottleneck: ScanLinkList**
+   - Consumes 22.0% of execution time
+   - Essentially no scaling: only 1.01× speedup with 4 threads
+   - Likely sequential in nature despite parallel implementation
+
+3. **Well-Scaling Phases**:
+   - FindFurthest: 87.7% parallel efficiency (nearly ideal)
+   - ExtractValid: 66.3% parallel efficiency (good)
+
+4. **Root Cause of Poor Overall Scaling**:
+   - Two middle phases (BuildLinkList + ScanLinkList) account for 74% of runtime
+   - Both phases scale poorly or not at all
+   - This explains why overall parallel efficiency is only 10% at 16 threads
+
 ### Recommendations for Future Work
 1. **Test Larger Inputs**: Try 100M+ intervals to find crossover point
 2. **Algorithm Optimization**: Reduce parallel overhead (simpler data structures)
@@ -189,22 +236,33 @@ The serial algorithm demonstrates **excellent linear scaling** from 1K to 10M in
 - `test_interval_covering.cpp` - Comprehensive test suite (10 test cases)
 - `benchmark_interval_covering.cpp` - Serial vs parallel comparison benchmark
 - `benchmark_thread_scaling.cpp` - Thread scaling benchmark
+- `benchmark_parallel_breakdown.cpp` - KernelParallel phase breakdown benchmark
 - `run_thread_scaling.sh` - Automated benchmark runner script
 
 ### Analysis Scripts
 - `analyze_benchmark.py` - Report generation script
-- `plot_performance.py` - Visualization generation script
+- `plot_performance.py` - Visualization generation script (4 graphs)
+- `plot_breakdown.py` - Breakdown visualization script (4 graphs)
 
 ### Data & Results
 - `benchmark_results.csv` - Serial vs parallel raw data
 - `thread_scaling_results.csv` - Thread scaling raw data (49 data points)
+- `parallel_breakdown.csv` - Phase breakdown timing data (24 data points)
 - `benchmark_report.txt` - Detailed performance analysis
 
 ### Visualizations (in `plots/` directory)
+
+**Overall Performance:**
 - `time_vs_size.png` / `.pdf` - Execution time vs input size graph
 - `speedup_vs_threads.png` / `.pdf` - Speedup vs thread count graph
 - `throughput_vs_threads.png` / `.pdf` - Throughput vs thread count graph
 - `efficiency_vs_threads.png` / `.pdf` - Parallel efficiency vs thread count graph
+
+**Phase Breakdown:**
+- `breakdown_stacked.png` / `.pdf` - Stacked bar chart of phase timings
+- `breakdown_scaling.png` / `.pdf` - Line graph of phase scaling with threads
+- `breakdown_percentage.png` / `.pdf` - Percentage breakdown by phase
+- `breakdown_speedup.png` / `.pdf` - Speedup curve for each phase
 
 ### Documentation
 - `WORK_SUMMARY.md` - This comprehensive summary document
@@ -213,7 +271,7 @@ The serial algorithm demonstrates **excellent linear scaling** from 1K to 10M in
 - `docs/plans/2025-12-30-thread-scaling-benchmark-design.md` - Benchmark design document
 
 ### Build Configuration
-- `CMakeLists.txt` - Updated with thread scaling benchmark target
+- `CMakeLists.txt` - Updated with all benchmark targets (thread scaling, breakdown)
 - `.gitignore` - C++ project exclusions
 - `venv/` - Python virtual environment with matplotlib and numpy
 
@@ -226,12 +284,16 @@ Successfully completed comprehensive performance analysis of the Parallel Minimu
 - ✅ Implemented comprehensive test suite - all tests passing
 - ✅ Benchmarked serial vs parallel performance across multiple configurations
 - ✅ Analyzed thread scaling from 1 to 32 threads
-- ✅ Generated publication-quality visualizations
+- ✅ Performed detailed breakdown analysis of all 4 KernelParallel phases
+- ✅ Generated publication-quality visualizations (8 graph types, PNG+PDF)
 
 **Key Findings:**
 - Serial greedy algorithm is **12-19× faster** than parallel for tested sizes (Release mode)
 - Serial achieves **517 M intervals/sec**, parallel peaks at 42.6 M/sec (16 threads)
 - Parallel algorithm has 19× overhead and poor scaling efficiency
+- **BuildLinkList is the primary bottleneck** (52% of time, only 1.4× speedup with 4 threads)
+- **ScanLinkList barely scales** (22% of time, 1.01× speedup - essentially sequential)
+- FindFurthest and ExtractValid scale well (87% and 66% efficiency respectively)
 - Compiler optimizations critical: 9-20× improvement from Debug to Release
 - Results demonstrate important lesson: **simple algorithms beat complex parallelism**
 - Strong educational value in understanding when parallelism actually helps
@@ -239,7 +301,8 @@ Successfully completed comprehensive performance analysis of the Parallel Minimu
 **Technical Success:**
 - Repository fully configured with proper build system
 - Both serial and parallel implementations working correctly
-- Comprehensive benchmarking infrastructure in place
+- Comprehensive benchmarking infrastructure in place (3 benchmarks, 3 analysis scripts)
 - All deliverables completed as specified
+- Identified exact bottlenecks through phase-level profiling
 
-The project serves as an excellent case study in parallel algorithm analysis, demonstrating both the implementation of sophisticated parallel techniques and the critical importance of empirical performance evaluation.
+The project serves as an excellent case study in parallel algorithm analysis, demonstrating both the implementation of sophisticated parallel techniques and the critical importance of empirical performance evaluation. The breakdown analysis reveals that even within a parallel algorithm, not all phases benefit equally from parallelization - understanding Amdahl's Law at the phase level is crucial for optimization.

@@ -20,23 +20,18 @@ struct BenchmarkResult {
 };
 
 // Generate test data with strict monotonicity
-// Must ensure: L(i) < L(i+1) AND R(i) < R(i+1) AND L(i) < R(i) AND L(i+1) <= R(i)
-std::vector<std::pair<int, int>> generate_intervals(size_t n, int seed = 42) {
+// Using int as the endpoint type for benchmarking
+parlay::sequence<std::pair<int, int>> generate_intervals(size_t n, int seed = 42) {
   std::mt19937 rng(seed);
-  std::uniform_int_distribution<int> left_step_dist(1, 5);
-  std::uniform_int_distribution<int> right_step_dist(4, 10);
+  std::uniform_int_distribution<int> step_dist(1, 10);
+  std::uniform_int_distribution<int> len_dist(5, 20);
 
-  std::vector<std::pair<int, int>> intervals;
-  intervals.reserve(n);
-
-  int left = 0;
-  int right = 10;
-
-  for (size_t i = 0; i < n; i++) {
-    intervals.push_back({left, right});
-    left += left_step_dist(rng);    // left strictly increases
-    right += right_step_dist(rng);  // right strictly increases (step >= 4 > max left_step 5)
-  }
+  parlay::sequence<int> lefts = parlay::tabulate(n, [&](size_t) { return step_dist(rng); });
+  parlay::scan_inplace(lefts);
+  parlay::sequence<int> rights = parlay::tabulate(n, [&](size_t i) { return lefts[i] + len_dist(rng); });
+  parlay::sequence<std::pair<int, int>> intervals = parlay::tabulate(n, [&](size_t i) {
+    return std::make_pair(lefts[i], rights[i]);
+  });
 
   return intervals;
 }
@@ -52,7 +47,7 @@ BenchmarkResult run_serial_benchmark(size_t n, int num_runs = 3) {
 
   for (int run = 0; run < num_runs; run++) {
     IntervalCovering solver(intervals.size(), getL, getR);
-    solver.valid = std::vector<uint8_t>(n, 0);
+    solver.valid = parlay::sequence<bool>(n, 0);
 
     auto start = high_resolution_clock::now();
     solver.KernelSerial();
