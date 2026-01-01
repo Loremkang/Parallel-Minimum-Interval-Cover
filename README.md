@@ -46,10 +46,10 @@ cmake ..
 make
 
 # Run tests
-./test_interval_covering
+./bin/test_interval_covering
 
 # Run benchmarks
-./benchmark_interval_covering
+./bin/benchmark_interval_covering
 ```
 
 ## Building with Debug Mode
