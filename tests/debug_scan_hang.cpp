@@ -47,10 +47,10 @@ int main() {
     std::cout << "Thread " << i << " starting from node " << solver.sampled_id[i] << "\n";
     std::cout.flush();
 
-    solver.sampled_id_nxt_initial[i] = solver.link_list[solver.sampled_id[i]].nxt;
+    solver.sampled_id_nxt_initial[i] = solver.link_list[solver.sampled_id[i]].get_nxt();
 
     size_t start_id = solver.sampled_id[i];
-    bool valid = solver.link_list[start_id].valid;
+    bool valid = solver.link_list[start_id].get_valid();
     size_t node_id = solver.link_list[start_id].get_nxt();
 
     size_t steps = 0;
@@ -63,7 +63,7 @@ int main() {
         break;
       }
 
-      valid = valid || solver.link_list[node_id].valid;
+      valid = valid || solver.link_list[node_id].get_valid();
       solver.link_list[node_id].set_valid(valid);
 
       if (solver.link_list[node_id].get_sampled()) {
@@ -72,7 +72,7 @@ int main() {
         std::cout.flush();
         break;
       }
-      node_id = solver.link_list[node_id].nxt;
+      node_id = solver.link_list[node_id].get_nxt();
     }
 
     solver.link(solver.sampled_id[i], node_id);
@@ -95,13 +95,13 @@ int main() {
     if (steps > 100) {
       std::cout << "HUNG! Stuck in infinite loop\n";
       std::cout << "Current node: " << node_id << "\n";
-      std::cout << "Next node: " << solver.link_list[node_id].nxt << "\n";
+      std::cout << "Next node: " << solver.link_list[node_id].get_nxt() << "\n";
       break;
     }
 
-    valid = valid || solver.link_list[node_id].valid;
-    solver.link_list[node_id].valid = valid;
-    node_id = solver.link_list[node_id].nxt;
+    valid = valid || solver.link_list[node_id].get_valid();
+    solver.link_list[node_id].set_valid(valid);
+    node_id = solver.link_list[node_id].get_nxt();
   }
 
   std::cout << "\nStep 6: Second parallel scan (restoring and scanning)\n";
@@ -116,7 +116,7 @@ int main() {
     solver.link(solver.sampled_id[i], solver.sampled_id_nxt_initial[i]);
 
     size_t start_id = solver.sampled_id[i];
-    bool valid = solver.link_list[start_id].valid;
+    bool valid = solver.link_list[start_id].get_valid();
     size_t node_id = solver.link_list[start_id].get_nxt();
 
     size_t steps = 0;
@@ -129,7 +129,7 @@ int main() {
         break;
       }
 
-      valid = valid || solver.link_list[node_id].valid;
+      valid = valid || solver.link_list[node_id].get_valid();
       solver.link_list[node_id].set_valid(valid);
 
       if (solver.link_list[node_id].get_sampled()) {
@@ -138,7 +138,7 @@ int main() {
         std::cout.flush();
         break;
       }
-      node_id = solver.link_list[node_id].nxt;
+      node_id = solver.link_list[node_id].get_nxt();
     }
 
     std::cout << "Thread " << i << " done with step 6\n";
