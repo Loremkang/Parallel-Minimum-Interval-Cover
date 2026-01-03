@@ -6,6 +6,7 @@
 #include <utility>
 #include "parlay/sequence.h"
 #include "parlay/primitives.h"
+#include "parlay/random.h"
 
 namespace test_utils {
 
@@ -39,17 +40,20 @@ inline parlay::sequence<std::pair<int, int>> generate_intervals(
   assert(step_max <= len_min && "step_max must be <= len_min to prevent gaps");
   assert(step_min > len_max - len_min && "step_min must be > len_max - len_min to guarantee R(i) strictly increasing");
 
-  std::mt19937 rng(seed);
-  std::uniform_int_distribution<int> step_dist(step_min, step_max);
-  std::uniform_int_distribution<int> len_dist(len_min, len_max);
+  // Use parlay::random for parallel random number generation with reproducibility
+  parlay::random rng(seed);
 
-  // Generate random numbers sequentially to ensure reproducibility
-  parlay::sequence<int> steps(n);
-  parlay::sequence<int> lens(n);
-  for (size_t i = 0; i < n; i++) {
-    steps[i] = step_dist(rng);
-    lens[i] = len_dist(rng);
-  }
+  // Generate random steps in parallel
+  parlay::sequence<int> steps = parlay::tabulate(n, [&](size_t i) {
+    auto rand_val = rng.ith_rand(2 * i);
+    return static_cast<int>(step_min + (rand_val % (step_max - step_min + 1)));
+  });
+
+  // Generate random lengths in parallel
+  parlay::sequence<int> lens = parlay::tabulate(n, [&](size_t i) {
+    auto rand_val = rng.ith_rand(2 * i + 1);
+    return static_cast<int>(len_min + (rand_val % (len_max - len_min + 1)));
+  });
 
   // Compute left endpoints via prefix sum (parallel)
   parlay::sequence<int> lefts = steps;

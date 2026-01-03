@@ -96,12 +96,64 @@ class IntervalCovering {
     }
   }
 
+  void FindFurthestCoreSerial(size_t ll, size_t lr, size_t rl, size_t rr) {
+    size_t rid = rl;
+    for (size_t i = ll; i <= lr; i ++) {
+      T r_of_i = R(i);
+      while (rid <= rr && L(rid) <= r_of_i) {
+        rid++;
+      }
+      furthest_id[i] = rid - 1;
+    }
+  }
+
+  // merge L[ll, lr] with R[rl, rr] to find furthest
+  void FindFurthestParallelCore(size_t ll, size_t lr, size_t rl, size_t rr) {
+    if (lr - ll + 1 + rr - rl + 1 <= parallel_merge_size) {
+      FindFurthestCoreSerial(ll, lr, rl, rr);
+      return;
+    }
+
+    size_t lmid = (ll + lr) >> 1;
+    T r_of_lmid = R(lmid);
+    
+    // find furthest[lmid] in [l, r)
+    size_t l = std::max(lmid, rl);
+    size_t r = rr + 1;
+    while (l + 1 < r) {
+      size_t mid = (l + r) >> 1;
+      if (L(mid) <= r_of_lmid) {
+        l = mid;
+      } else {
+        r = mid;
+      }
+    }
+    furthest_id[lmid] = l;
+
+    // recurse on left and right halves
+    parlay::par_do(
+      [&]() {
+        if (ll < lmid) {
+          FindFurthestParallelCore(ll, lmid - 1, rl, l);
+        }
+      },
+      [&]() {
+        if (lmid < lr) {
+          FindFurthestParallelCore(lmid + 1, lr, l, rr);
+        }
+      }
+    );
+
+  }
+
+  // merge L with R to find furthest
   void FindFurthestParallel() {
-    parlay::internal::sliced_for(n, parallel_block_size,
-                                 [&](size_t i, size_t s, size_t e) {
-                                   (void)i;
-                                   FindFurthestSerial(s, e);
-                                 });
+    FindFurthestParallelCore(0, n - 1, 0, n - 1);
+    // parlay::internal::sliced_for(n, parallel_block_size,
+    //                              [&](size_t i, size_t s, size_t e) {
+    //                                (void)i;
+    //                                FindFurthestSerial(s, e);
+    //                              });
   }
 
   void FindFurthest() {
@@ -423,6 +475,7 @@ class IntervalCovering {
   }
 
   static constexpr size_t parallel_block_size = parlay::internal::_block_size;
+  static constexpr size_t parallel_merge_size = 2000;
   // kNullPtr must fit in 62 bits (LinkListNode.nxt is 62 bits)
 
   size_t n;

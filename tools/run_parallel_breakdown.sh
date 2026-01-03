@@ -1,22 +1,22 @@
 #!/bin/bash
 
-# Thread Scaling Benchmark Runner
-# This script runs the benchmark with different thread counts
+# Parallel Breakdown Benchmark Runner
+# This script runs the parallel breakdown benchmark with different thread counts
 
 # Get the directory where the script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 BUILD_DIR="$SCRIPT_DIR/../build/bin"
-BENCHMARK="$BUILD_DIR/benchmark_thread_scaling"
+BENCHMARK="$BUILD_DIR/benchmark_parallel_breakdown"
 
 # Check if benchmark exists
 if [ ! -f "$BENCHMARK" ]; then
-    echo "Error: benchmark_thread_scaling not found in $BUILD_DIR"
-    echo "Please run: cd build && cmake .. && make benchmark_thread_scaling"
+    echo "Error: benchmark_parallel_breakdown not found in $BUILD_DIR"
+    echo "Please run: cd build && cmake .. && ninja benchmark_parallel_breakdown"
     exit 1
 fi
 
 # Remove old results file
-rm -f thread_scaling_results.csv
+rm -f parallel_breakdown.csv
 
 # Get system thread count
 SYSTEM_THREADS=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 8)
@@ -48,8 +48,8 @@ done
 
 echo "======================================"
 echo "Benchmarking complete!"
-echo "Results saved to thread_scaling_results.csv"
+echo "Results saved to parallel_breakdown.csv"
 echo ""
 echo "To generate graphs, run:"
-echo "  python3 plot_performance.py"
+echo "  python3 tools/plot_breakdown.py"
 echo ""
