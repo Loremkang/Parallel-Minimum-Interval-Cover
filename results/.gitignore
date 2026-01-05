@@ -1,0 +1,5 @@
+# Ignore all CSV result files
+*.csv
+
+# But track the directory
+!.gitignore

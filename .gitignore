@@ -36,8 +36,10 @@ benchmark_thread_scaling
 # Test and benchmark outputs
 test_output/
 benchmark_results/
-results/
-plots/
+results/*.csv
+plots/*.png
+plots/*.pdf
+plots/*.svg
 *.png
 *.pdf
 *.svg
