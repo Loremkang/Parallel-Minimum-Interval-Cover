@@ -170,8 +170,8 @@ int main(int argc, char* argv[]) {
   }
 
   // Append results to CSV (allows multiple runs with different thread counts)
-  bool file_exists = std::ifstream("thread_scaling_results.csv").good();
-  std::ofstream csv("thread_scaling_results.csv", std::ios::app);
+  bool file_exists = std::ifstream("thread_scaling.csv").good();
+  std::ofstream csv("thread_scaling.csv", std::ios::app);
 
   if (!file_exists) {
     csv << "algorithm,n,threads,time_ms,num_selected,throughput_M_per_sec\n";
@@ -188,7 +188,7 @@ int main(int argc, char* argv[]) {
   csv.close();
 
   std::cout << "\n=====================================\n";
-  std::cout << "Results appended to thread_scaling_results.csv\n";
+  std::cout << "Results appended to thread_scaling.csv\n";
   std::cout << "Run with different PARLAY_NUM_THREADS values to collect more data\n";
   std::cout << "Then run plot_performance.py to generate visualizations\n";
 
