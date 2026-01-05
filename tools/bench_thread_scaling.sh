@@ -12,7 +12,7 @@ echo "========================================="
 echo ""
 echo "[1/3] Recompiling project..."
 cd "$PROJECT_ROOT/build"
-cmake .. && make benchmark_thread_scaling
+cmake -G Ninja .. && ninja benchmark_thread_scaling
 cd - > /dev/null
 
 # Step 2: Run benchmark
