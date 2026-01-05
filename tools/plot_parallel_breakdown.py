@@ -34,10 +34,11 @@ with open(INPUT_FILE, 'r') as f:
         data.append({
             'n': int(row['n']),
             'threads': int(row['threads']),
-            'find_furthest_ms': float(row['find_furthest_ms']),
-            'build_linklist_ms': float(row['build_linklist_ms']),
-            'scan_linklist_ms': float(row['scan_linklist_ms']),
-            'extract_valid_ms': float(row['extract_valid_ms']),
+            'build_furthest_ms': float(row['build_furthest_ms']),
+            'sample_intervals_ms': float(row['sample_intervals_ms']),
+            'build_connections_ms': float(row['build_connections_ms']),
+            'scan_samples_ms': float(row['scan_samples_ms']),
+            'scan_nonsample_ms': float(row['scan_nonsample_ms']),
             'total_ms': float(row['total_ms'])
         })
 
@@ -82,26 +83,30 @@ fig, ax = plt.subplots(figsize=(12, 7))
 breakdown_data = sorted(get_data(n=n_focus), key=lambda x: x['threads'])
 
 threads = [r['threads'] for r in breakdown_data]
-find_furthest = [r['find_furthest_ms'] for r in breakdown_data]
-build_linklist = [r['build_linklist_ms'] for r in breakdown_data]
-scan_linklist = [r['scan_linklist_ms'] for r in breakdown_data]
-extract_valid = [r['extract_valid_ms'] for r in breakdown_data]
+build_furthest = [r['build_furthest_ms'] for r in breakdown_data]
+sample_intervals = [r['sample_intervals_ms'] for r in breakdown_data]
+build_connections = [r['build_connections_ms'] for r in breakdown_data]
+scan_samples = [r['scan_samples_ms'] for r in breakdown_data]
+scan_nonsample = [r['scan_nonsample_ms'] for r in breakdown_data]
 
 x = np.arange(len(threads))
 width = 0.6
 
-p1 = ax.bar(x, find_furthest, width, label='BuildFurthest', color='#3498db')
-p2 = ax.bar(x, build_linklist, width, bottom=find_furthest, label='BuildLinkList', color='#e74c3c')
-p3 = ax.bar(x, scan_linklist, width,
-            bottom=np.array(find_furthest) + np.array(build_linklist),
-            label='ScanLinkList', color='#2ecc71')
-p4 = ax.bar(x, extract_valid, width,
-            bottom=np.array(find_furthest) + np.array(build_linklist) + np.array(scan_linklist),
-            label='ExtractValid', color='#f39c12')
+p1 = ax.bar(x, build_furthest, width, label='BuildFurthest', color='#3498db')
+p2 = ax.bar(x, sample_intervals, width, bottom=build_furthest, label='SampleIntervals', color='#e74c3c')
+p3 = ax.bar(x, build_connections, width,
+            bottom=np.array(build_furthest) + np.array(sample_intervals),
+            label='BuildConnections', color='#2ecc71')
+p4 = ax.bar(x, scan_samples, width,
+            bottom=np.array(build_furthest) + np.array(sample_intervals) + np.array(build_connections),
+            label='ScanSamples', color='#f39c12')
+p5 = ax.bar(x, scan_nonsample, width,
+            bottom=np.array(build_furthest) + np.array(sample_intervals) + np.array(build_connections) + np.array(scan_samples),
+            label='ScanNonsample', color='#9b59b6')
 
 ax.set_xlabel('Thread Count', fontsize=12, fontweight='bold')
 ax.set_ylabel('Time (ms)', fontsize=12, fontweight='bold')
-ax.set_title(f'KernelParallel Phase Breakdown (n={n_focus:,})', fontsize=14, fontweight='bold')
+ax.set_title(f'KernelParallelFast Phase Breakdown (n={n_focus:,})', fontsize=14, fontweight='bold')
 ax.set_xticks(x)
 ax.set_xticklabels(threads)
 ax.legend(loc='upper right')
@@ -122,19 +127,22 @@ fig, ax = plt.subplots(figsize=(12, 7))
 
 breakdown_data = sorted(get_data(n=n_focus), key=lambda x: x['threads'])
 threads = [r['threads'] for r in breakdown_data]
-find_furthest = [r['find_furthest_ms'] for r in breakdown_data]
-build_linklist = [r['build_linklist_ms'] for r in breakdown_data]
-scan_linklist = [r['scan_linklist_ms'] for r in breakdown_data]
-extract_valid = [r['extract_valid_ms'] for r in breakdown_data]
+build_furthest = [r['build_furthest_ms'] for r in breakdown_data]
+sample_intervals = [r['sample_intervals_ms'] for r in breakdown_data]
+build_connections = [r['build_connections_ms'] for r in breakdown_data]
+scan_samples = [r['scan_samples_ms'] for r in breakdown_data]
+scan_nonsample = [r['scan_nonsample_ms'] for r in breakdown_data]
 
-ax.plot(threads, find_furthest, marker='o', markersize=8, linewidth=2,
+ax.plot(threads, build_furthest, marker='o', markersize=8, linewidth=2,
         label='BuildFurthest', color='#3498db')
-ax.plot(threads, build_linklist, marker='s', markersize=8, linewidth=2,
-        label='BuildLinkList', color='#e74c3c')
-ax.plot(threads, scan_linklist, marker='^', markersize=8, linewidth=2,
-        label='ScanLinkList', color='#2ecc71')
-ax.plot(threads, extract_valid, marker='d', markersize=8, linewidth=2,
-        label='ExtractValid', color='#f39c12')
+ax.plot(threads, sample_intervals, marker='s', markersize=8, linewidth=2,
+        label='SampleIntervals', color='#e74c3c')
+ax.plot(threads, build_connections, marker='^', markersize=8, linewidth=2,
+        label='BuildConnections', color='#2ecc71')
+ax.plot(threads, scan_samples, marker='d', markersize=8, linewidth=2,
+        label='ScanSamples', color='#f39c12')
+ax.plot(threads, scan_nonsample, marker='*', markersize=10, linewidth=2,
+        label='ScanNonsample', color='#9b59b6')
 
 ax.set_xlabel('Thread Count', fontsize=12, fontweight='bold')
 ax.set_ylabel('Time (ms)', fontsize=12, fontweight='bold')
@@ -160,23 +168,27 @@ breakdown_data = sorted(get_data(n=n_focus), key=lambda x: x['threads'])
 threads = [r['threads'] for r in breakdown_data]
 
 # Calculate percentages
-find_furthest_pct = [r['find_furthest_ms'] / r['total_ms'] * 100 for r in breakdown_data]
-build_linklist_pct = [r['build_linklist_ms'] / r['total_ms'] * 100 for r in breakdown_data]
-scan_linklist_pct = [r['scan_linklist_ms'] / r['total_ms'] * 100 for r in breakdown_data]
-extract_valid_pct = [r['extract_valid_ms'] / r['total_ms'] * 100 for r in breakdown_data]
+build_furthest_pct = [r['build_furthest_ms'] / r['total_ms'] * 100 for r in breakdown_data]
+sample_intervals_pct = [r['sample_intervals_ms'] / r['total_ms'] * 100 for r in breakdown_data]
+build_connections_pct = [r['build_connections_ms'] / r['total_ms'] * 100 for r in breakdown_data]
+scan_samples_pct = [r['scan_samples_ms'] / r['total_ms'] * 100 for r in breakdown_data]
+scan_nonsample_pct = [r['scan_nonsample_ms'] / r['total_ms'] * 100 for r in breakdown_data]
 
 x = np.arange(len(threads))
 width = 0.6
 
-p1 = ax.bar(x, find_furthest_pct, width, label='BuildFurthest', color='#3498db')
-p2 = ax.bar(x, build_linklist_pct, width, bottom=find_furthest_pct,
-            label='BuildLinkList', color='#e74c3c')
-p3 = ax.bar(x, scan_linklist_pct, width,
-            bottom=np.array(find_furthest_pct) + np.array(build_linklist_pct),
-            label='ScanLinkList', color='#2ecc71')
-p4 = ax.bar(x, extract_valid_pct, width,
-            bottom=np.array(find_furthest_pct) + np.array(build_linklist_pct) + np.array(scan_linklist_pct),
-            label='ExtractValid', color='#f39c12')
+p1 = ax.bar(x, build_furthest_pct, width, label='BuildFurthest', color='#3498db')
+p2 = ax.bar(x, sample_intervals_pct, width, bottom=build_furthest_pct,
+            label='SampleIntervals', color='#e74c3c')
+p3 = ax.bar(x, build_connections_pct, width,
+            bottom=np.array(build_furthest_pct) + np.array(sample_intervals_pct),
+            label='BuildConnections', color='#2ecc71')
+p4 = ax.bar(x, scan_samples_pct, width,
+            bottom=np.array(build_furthest_pct) + np.array(sample_intervals_pct) + np.array(build_connections_pct),
+            label='ScanSamples', color='#f39c12')
+p5 = ax.bar(x, scan_nonsample_pct, width,
+            bottom=np.array(build_furthest_pct) + np.array(sample_intervals_pct) + np.array(build_connections_pct) + np.array(scan_samples_pct),
+            label='ScanNonsample', color='#9b59b6')
 
 ax.set_xlabel('Thread Count', fontsize=12, fontweight='bold')
 ax.set_ylabel('Percentage of Total Time (%)', fontsize=12, fontweight='bold')
@@ -205,25 +217,29 @@ threads = [r['threads'] for r in breakdown_data]
 
 # Get 1-thread baseline
 baseline = get_data(n=n_focus, threads=1)[0]
-baseline_find = baseline['find_furthest_ms']
-baseline_build = baseline['build_linklist_ms']
-baseline_scan = baseline['scan_linklist_ms']
-baseline_extract = baseline['extract_valid_ms']
+baseline_build_furthest = baseline['build_furthest_ms']
+baseline_sample_intervals = baseline['sample_intervals_ms']
+baseline_build_connections = baseline['build_connections_ms']
+baseline_scan_samples = baseline['scan_samples_ms']
+baseline_scan_nonsample = baseline['scan_nonsample_ms']
 
 # Calculate speedups
-find_speedup = [baseline_find / r['find_furthest_ms'] for r in breakdown_data]
-build_speedup = [baseline_build / r['build_linklist_ms'] for r in breakdown_data]
-scan_speedup = [baseline_scan / r['scan_linklist_ms'] for r in breakdown_data]
-extract_speedup = [baseline_extract / r['extract_valid_ms'] for r in breakdown_data]
+build_furthest_speedup = [baseline_build_furthest / r['build_furthest_ms'] for r in breakdown_data]
+sample_intervals_speedup = [baseline_sample_intervals / r['sample_intervals_ms'] for r in breakdown_data]
+build_connections_speedup = [baseline_build_connections / r['build_connections_ms'] for r in breakdown_data]
+scan_samples_speedup = [baseline_scan_samples / r['scan_samples_ms'] for r in breakdown_data]
+scan_nonsample_speedup = [baseline_scan_nonsample / r['scan_nonsample_ms'] for r in breakdown_data]
 
-ax.plot(threads, find_speedup, marker='o', markersize=8, linewidth=2,
+ax.plot(threads, build_furthest_speedup, marker='o', markersize=8, linewidth=2,
         label='BuildFurthest', color='#3498db')
-ax.plot(threads, build_speedup, marker='s', markersize=8, linewidth=2,
-        label='BuildLinkList', color='#e74c3c')
-ax.plot(threads, scan_speedup, marker='^', markersize=8, linewidth=2,
-        label='ScanLinkList', color='#2ecc71')
-ax.plot(threads, extract_speedup, marker='d', markersize=8, linewidth=2,
-        label='ExtractValid', color='#f39c12')
+ax.plot(threads, sample_intervals_speedup, marker='s', markersize=8, linewidth=2,
+        label='SampleIntervals', color='#e74c3c')
+ax.plot(threads, build_connections_speedup, marker='^', markersize=8, linewidth=2,
+        label='BuildConnections', color='#2ecc71')
+ax.plot(threads, scan_samples_speedup, marker='d', markersize=8, linewidth=2,
+        label='ScanSamples', color='#f39c12')
+ax.plot(threads, scan_nonsample_speedup, marker='*', markersize=10, linewidth=2,
+        label='ScanNonsample', color='#9b59b6')
 
 # Ideal linear speedup
 ax.plot(threads, threads, 'k:', linewidth=2, alpha=0.5, label='Ideal Linear')
@@ -253,23 +269,25 @@ baseline = breakdown_data[0]
 
 print(f"\nBaseline (1 thread):")
 print(f"  Total: {baseline['total_ms']:.2f} ms")
-print(f"    BuildFurthest:  {baseline['find_furthest_ms']:7.2f} ms ({baseline['find_furthest_ms']/baseline['total_ms']*100:5.1f}%)")
-print(f"    BuildLinkList: {baseline['build_linklist_ms']:7.2f} ms ({baseline['build_linklist_ms']/baseline['total_ms']*100:5.1f}%)")
-print(f"    ScanLinkList:  {baseline['scan_linklist_ms']:7.2f} ms ({baseline['scan_linklist_ms']/baseline['total_ms']*100:5.1f}%)")
-print(f"    ExtractValid:  {baseline['extract_valid_ms']:7.2f} ms ({baseline['extract_valid_ms']/baseline['total_ms']*100:5.1f}%)")
+print(f"    BuildFurthest:     {baseline['build_furthest_ms']:7.2f} ms ({baseline['build_furthest_ms']/baseline['total_ms']*100:5.1f}%)")
+print(f"    SampleIntervals:   {baseline['sample_intervals_ms']:7.2f} ms ({baseline['sample_intervals_ms']/baseline['total_ms']*100:5.1f}%)")
+print(f"    BuildConnections:  {baseline['build_connections_ms']:7.2f} ms ({baseline['build_connections_ms']/baseline['total_ms']*100:5.1f}%)")
+print(f"    ScanSamples:       {baseline['scan_samples_ms']:7.2f} ms ({baseline['scan_samples_ms']/baseline['total_ms']*100:5.1f}%)")
+print(f"    ScanNonsample:     {baseline['scan_nonsample_ms']:7.2f} ms ({baseline['scan_nonsample_ms']/baseline['total_ms']*100:5.1f}%)")
 
-print(f"\n{'Threads':<8} {'BuildFurthest':<15} {'BuildLinkList':<15} {'ScanLinkList':<15} {'ExtractValid':<15} {'Total':<10}")
-print("-" * 80)
+print(f"\n{'Threads':<8} {'BuildFurthest':<17} {'SampleIntervals':<17} {'BuildConnections':<17} {'ScanSamples':<15} {'ScanNonsample':<15} {'Total':<10}")
+print("-" * 105)
 
 for r in breakdown_data:
     t = r['threads']
-    find_sp = baseline['find_furthest_ms'] / r['find_furthest_ms']
-    build_sp = baseline['build_linklist_ms'] / r['build_linklist_ms']
-    scan_sp = baseline['scan_linklist_ms'] / r['scan_linklist_ms']
-    extract_sp = baseline['extract_valid_ms'] / r['extract_valid_ms']
+    build_furthest_sp = baseline['build_furthest_ms'] / r['build_furthest_ms']
+    sample_intervals_sp = baseline['sample_intervals_ms'] / r['sample_intervals_ms']
+    build_connections_sp = baseline['build_connections_ms'] / r['build_connections_ms']
+    scan_samples_sp = baseline['scan_samples_ms'] / r['scan_samples_ms']
+    scan_nonsample_sp = baseline['scan_nonsample_ms'] / r['scan_nonsample_ms']
     total_sp = baseline['total_ms'] / r['total_ms']
 
-    print(f"{t:<8} {find_sp:>6.2f}x        {build_sp:>6.2f}x        {scan_sp:>6.2f}x        {extract_sp:>6.2f}x        {total_sp:>6.2f}x")
+    print(f"{t:<8} {build_furthest_sp:>6.2f}x          {sample_intervals_sp:>6.2f}x          {build_connections_sp:>6.2f}x          {scan_samples_sp:>6.2f}x        {scan_nonsample_sp:>6.2f}x        {total_sp:>6.2f}x")
 
 print("\n" + "="*70)
 print("KEY FINDINGS:")
@@ -282,7 +300,7 @@ print(f"   - Total speedup: {baseline['total_ms'] / best['total_ms']:.2f}x")
 print(f"   - Time: {best['total_ms']:.2f} ms (down from {baseline['total_ms']:.2f} ms)")
 
 # Identify bottleneck
-bottleneck_phase = max(['find_furthest', 'build_linklist', 'scan_linklist', 'extract_valid'],
+bottleneck_phase = max(['build_furthest', 'sample_intervals', 'build_connections', 'scan_samples', 'scan_nonsample'],
                        key=lambda phase: baseline[f'{phase}_ms'])
 print(f"\n2. Primary Bottleneck: {bottleneck_phase.replace('_', ' ').title()}")
 print(f"   - Takes {baseline[f'{bottleneck_phase}_ms']/baseline['total_ms']*100:.1f}% of total time (1 thread)")
@@ -290,13 +308,14 @@ print(f"   - Takes {best[f'{bottleneck_phase}_ms']/best['total_ms']*100:.1f}% of
 
 # Analyze scaling
 print(f"\n3. Phase Scaling Analysis (1 → {best['threads']} threads):")
-for phase_name, phase_key in [('BuildFurthest', 'find_furthest_ms'),
-                               ('BuildLinkList', 'build_linklist_ms'),
-                               ('ScanLinkList', 'scan_linklist_ms'),
-                               ('ExtractValid', 'extract_valid_ms')]:
+for phase_name, phase_key in [('BuildFurthest', 'build_furthest_ms'),
+                               ('SampleIntervals', 'sample_intervals_ms'),
+                               ('BuildConnections', 'build_connections_ms'),
+                               ('ScanSamples', 'scan_samples_ms'),
+                               ('ScanNonsample', 'scan_nonsample_ms')]:
     speedup = baseline[phase_key] / best[phase_key]
     efficiency = (speedup / best['threads']) * 100
-    print(f"   - {phase_name:<15}: {speedup:5.2f}x speedup ({efficiency:5.1f}% efficiency)")
+    print(f"   - {phase_name:<17}: {speedup:5.2f}x speedup ({efficiency:5.1f}% efficiency)")
 
 print("\n" + "="*70)
 print("All breakdown graphs generated successfully in ./plots/")

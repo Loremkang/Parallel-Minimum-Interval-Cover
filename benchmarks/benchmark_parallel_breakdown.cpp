@@ -13,14 +13,15 @@ using namespace std::chrono;
 struct BreakdownResult {
   size_t n;
   size_t threads;
-  double find_furthest_ms;
-  double build_linklist_ms;
-  double scan_linklist_ms;
-  double extract_valid_ms;
+  double build_furthest_ms;
+  double sample_intervals_ms;
+  double build_connections_ms;
+  double scan_samples_ms;
+  double scan_nonsample_ms;
   double total_ms;
 };
 
-// Run KernelParallel with timing for each phase
+// Run KernelParallelFast with timing for each phase
 template<typename GetL, typename GetR>
 BreakdownResult RunKernelParallelWithTiming(IntervalCovering<GetL, GetR>& solver) {
   BreakdownResult result;
@@ -33,27 +34,31 @@ BreakdownResult RunKernelParallelWithTiming(IntervalCovering<GetL, GetR>& solver
   auto start = high_resolution_clock::now();
   solver.BuildFurthest();
   auto end = high_resolution_clock::now();
-  result.find_furthest_ms = duration_cast<microseconds>(end - start).count() / 1000.0;
+  result.build_furthest_ms = duration_cast<microseconds>(end - start).count() / 1000.0;
 
-  // Phase 2: BuildLinkList
+  // Phase 2: BuildIntervalSample
   start = high_resolution_clock::now();
-  solver.BuildLinkList();
+  solver.BuildIntervalSample();
   end = high_resolution_clock::now();
-  result.build_linklist_ms = duration_cast<microseconds>(end - start).count() / 1000.0;
+  result.sample_intervals_ms = duration_cast<microseconds>(end - start).count() / 1000.0;
 
-  // Phase 3: ScanLinkList
+  // Phase 3: BuildConnectionBetweenSamples
   start = high_resolution_clock::now();
-  solver.ScanLinkList();
+  solver.BuildConnectionBetweenSamples();
   end = high_resolution_clock::now();
-  result.scan_linklist_ms = duration_cast<microseconds>(end - start).count() / 1000.0;
+  result.build_connections_ms = duration_cast<microseconds>(end - start).count() / 1000.0;
 
-  // Phase 4: Extract valid flags (the parallel_for at the end of KernelParallel)
+  // Phase 4: ScanSamples
   start = high_resolution_clock::now();
-  parlay::parallel_for(0, solver.n, [&](size_t i) {
-    solver.valid[i] = (solver.l_node(i).get_valid() != solver.r_node(i).get_valid()) ? 1 : 0;
-  });
+  solver.ScanSamples();
   end = high_resolution_clock::now();
-  result.extract_valid_ms = duration_cast<microseconds>(end - start).count() / 1000.0;
+  result.scan_samples_ms = duration_cast<microseconds>(end - start).count() / 1000.0;
+
+  // Phase 5: ScanNonsampleNodes
+  start = high_resolution_clock::now();
+  solver.ScanNonsampleNodes();
+  end = high_resolution_clock::now();
+  result.scan_nonsample_ms = duration_cast<microseconds>(end - start).count() / 1000.0;
 
   auto end_total = high_resolution_clock::now();
   result.total_ms = duration_cast<microseconds>(end_total - start_total).count() / 1000.0;
@@ -107,12 +112,13 @@ int main(int argc, char* argv[]) {
 
   std::cout << std::setw(12) << "N"
             << std::setw(14) << "BuildFurthest"
-            << std::setw(12) << "BuildLink"
-            << std::setw(12) << "ScanLink"
-            << std::setw(14) << "ExtractValid"
+            << std::setw(14) << "SampleInterv"
+            << std::setw(14) << "BuildConnect"
+            << std::setw(12) << "ScanSample"
+            << std::setw(14) << "ScanNonsample"
             << std::setw(12) << "Total"
             << "\n";
-  std::cout << std::string(76, '-') << "\n";
+  std::cout << std::string(92, '-') << "\n";
 
   for (size_t n : sizes) {
     std::cout << "Running n=" << n << "..." << std::flush;
@@ -121,10 +127,11 @@ int main(int argc, char* argv[]) {
 
     std::cout << "\r";
     std::cout << std::setw(12) << n
-              << std::setw(14) << std::fixed << std::setprecision(2) << result.find_furthest_ms
-              << std::setw(12) << result.build_linklist_ms
-              << std::setw(12) << result.scan_linklist_ms
-              << std::setw(14) << result.extract_valid_ms
+              << std::setw(14) << std::fixed << std::setprecision(2) << result.build_furthest_ms
+              << std::setw(14) << result.sample_intervals_ms
+              << std::setw(14) << result.build_connections_ms
+              << std::setw(12) << result.scan_samples_ms
+              << std::setw(14) << result.scan_nonsample_ms
               << std::setw(12) << result.total_ms
               << std::endl;
 
@@ -139,16 +146,17 @@ int main(int argc, char* argv[]) {
   std::ofstream csv("parallel_breakdown.csv", std::ios::app);
 
   if (!file_exists) {
-    csv << "n,threads,find_furthest_ms,build_linklist_ms,scan_linklist_ms,extract_valid_ms,total_ms\n";
+    csv << "n,threads,build_furthest_ms,sample_intervals_ms,build_connections_ms,scan_samples_ms,scan_nonsample_ms,total_ms\n";
   }
 
   for (const auto& r : results) {
     csv << r.n << "," << r.threads << ","
         << std::fixed << std::setprecision(4)
-        << r.find_furthest_ms << ","
-        << r.build_linklist_ms << ","
-        << r.scan_linklist_ms << ","
-        << r.extract_valid_ms << ","
+        << r.build_furthest_ms << ","
+        << r.sample_intervals_ms << ","
+        << r.build_connections_ms << ","
+        << r.scan_samples_ms << ","
+        << r.scan_nonsample_ms << ","
         << r.total_ms << "\n";
   }
   csv.close();
