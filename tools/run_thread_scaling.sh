@@ -2,12 +2,21 @@
 set -e  # Exit on error
 set -u  # Error on undefined variables
 
-# Configuration
-NUMA_NODE=0  # Hardcoded NUMA node configuration
-
 # Path setup (relative to project root)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Load centralized configuration
+source "$SCRIPT_DIR/benchmark_config.sh"
+
+# Setup Python virtual environment
+if [ -d "$PROJECT_ROOT/$VENV_PATH" ]; then
+    echo "Activating Python virtual environment..."
+    source "$PROJECT_ROOT/$VENV_PATH/bin/activate"
+else
+    echo "WARNING: Python venv not found at $PROJECT_ROOT/$VENV_PATH"
+    echo "Continuing without venv..."
+fi
 BUILD_DIR="$PROJECT_ROOT/build/bin"
 RESULTS_DIR="$PROJECT_ROOT/results"
 
@@ -40,9 +49,6 @@ echo "System has $SYSTEM_THREADS threads"
 echo "NUMA binding: node $NUMA_NODE"
 echo "Output: $OUTPUT_FILE"
 echo ""
-
-# Thread counts to test
-THREAD_COUNTS="1 2 4 8 16 32"
 
 # Filter thread counts to not exceed system max
 FILTERED_COUNTS=""

@@ -70,33 +70,7 @@ class IntervalCovering {
     }
   }
 
-  void FindFurthestSerial(size_t s, size_t e) {
-    // Binary search for the first segment
-    T r_of_s = R(s);
-    size_t l = s;
-    size_t r = n;
-    while (l + 1 < r) {
-      size_t mid = (l + r) / 2;
-      if (L(mid) <= r_of_s) {
-        l = mid;
-      } else {
-        r = mid;
-      }
-    }
-    furthest_id[s] = l;
-
-    // Process remaining segments using monotonicity
-    for (size_t j = s + 1; j < e; j++) {
-      size_t rid = furthest_id[j - 1];
-      T r_of_j = R(j);
-      while (rid < n && L(rid) <= r_of_j) {
-        rid++;
-      }
-      furthest_id[j] = rid - 1;
-    }
-  }
-
-  void FindFurthestCoreSerial(size_t ll, size_t lr, size_t rl, size_t rr) {
+  void FindFurthestSerial(size_t ll, size_t lr, size_t rl, size_t rr) {
     size_t rid = rl;
     for (size_t i = ll; i <= lr; i ++) {
       T r_of_i = R(i);
@@ -110,7 +84,7 @@ class IntervalCovering {
   // merge L[ll, lr] with R[rl, rr] to find furthest
   void FindFurthestParallelCore(size_t ll, size_t lr, size_t rl, size_t rr) {
     if (lr - ll + 1 + rr - rl + 1 <= parallel_merge_size) {
-      FindFurthestCoreSerial(ll, lr, rl, rr);
+      FindFurthestSerial(ll, lr, rl, rr);
       return;
     }
 
@@ -149,11 +123,6 @@ class IntervalCovering {
   // merge L with R to find furthest
   void FindFurthestParallel() {
     FindFurthestParallelCore(0, n - 1, 0, n - 1);
-    // parlay::internal::sliced_for(n, parallel_block_size,
-    //                              [&](size_t i, size_t s, size_t e) {
-    //                                (void)i;
-    //                                FindFurthestSerial(s, e);
-    //                              });
   }
 
   void FindFurthest() {
@@ -168,7 +137,7 @@ class IntervalCovering {
       // Run serial version on a copy to verify
       parlay::sequence<size_t> furthest_id_serial(n);
       std::swap(furthest_id, furthest_id_serial);
-      FindFurthestSerial(0, n);
+      FindFurthestSerial(0, n - 1, 0, n - 1);
 
       // Verify results match
       for (size_t i = 0; i < n; i++) {
@@ -180,8 +149,40 @@ class IntervalCovering {
     }
   }
 
+  void BuildLinkListFast() {
+    link_list = parlay::sequence<LinkListNode>(n * 2, LinkListNode());
+
+    assert(n >= 2);
+
+    // furthest_id[n - 2] == furthest_id[n - 1] == n - 1, can cause loop
+    link(l_nodeid(n - 2), r_nodeid(n - 2));
+    link(r_nodeid(n - 2), r_nodeid(n - 1));
+    parlay::parallel_for(0, n - 2, [&](size_t i) {
+      link(l_nodeid(i), r_nodeid(i));
+      if (furthest_id[i] == furthest_id[i + 1]) {
+        link(r_nodeid(i), l_nodeid(i + 1));
+      } else {
+        link(r_nodeid(i), r_nodeid(furthest_id[i]));
+      }
+    }, parallel_block_size);
+
+    // furthest_id[0] != 0, must link
+    // furthest_id[n - 1] == n - 1, no need to link
+    link(l_nodeid(furthest_id[0]), l_nodeid(0));
+    parlay::parallel_for(1, n - 1, [&](size_t i) {
+      if (furthest_id[i - 1] != furthest_id[i]) {
+        link(l_nodeid(furthest_id[i]), l_nodeid(i));
+      }
+    }, parallel_block_size);
+
+    r_node(0).set_valid(true);
+  }
+
   // Build the link list for the euler tour
   void BuildLinkList() {
+    BuildLinkListFast();
+    return;
+
     link_list = parlay::sequence<LinkListNode>(n * 2, LinkListNode());
 
     r_node(0).set_valid(true);
@@ -348,6 +349,14 @@ class IntervalCovering {
     }
   }
 
+  void PrintLinkListNodes() {
+    for (size_t i = 0; i < link_list.size(); i++) {
+      std::cout << node_str(i) << ": nxt=" << node_str(link_list[i].get_nxt())
+                << ", valid=" << link_list[i].get_valid()
+                << ", sampled=" << link_list[i].get_sampled() << "\n";
+    }
+  }
+
   void PrintLinkList() {
     size_t nodeid = l_nodeid(n - 1);
     while (nodeid != kNullPtr) {
@@ -423,6 +432,12 @@ class IntervalCovering {
   }
 
   void Kernel() {
+    if (n <= 2) {
+      valid[0] = 1;
+      valid[n - 1] = 1;
+      return;
+    }
+
     KernelParallel();
 
     DEBUG_ONLY {
