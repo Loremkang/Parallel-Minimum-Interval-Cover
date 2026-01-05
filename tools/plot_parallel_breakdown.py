@@ -69,14 +69,16 @@ print(f"Input sizes: {sizes}")
 print(f"Thread counts: {thread_counts}\n")
 
 # ============================================================================
-# Graph 1: Stacked Bar Chart - Time Breakdown by Thread Count (10M intervals)
+# Graph 1: Stacked Bar Chart - Time Breakdown by Thread Count (largest size)
 # ============================================================================
-print("Graph 1: Stacked Bar Chart - Phase Breakdown (n=10M)...")
+
+# Automatically select the largest size from available data
+n_focus = max(sizes)
+print(f"Graph 1: Stacked Bar Chart - Phase Breakdown (n={n_focus:,})...")
 
 fig, ax = plt.subplots(figsize=(12, 7))
 
 # Focus on largest size to see bottlenecks clearly
-n_focus = 10000000
 breakdown_data = sorted(get_data(n=n_focus), key=lambda x: x['threads'])
 
 threads = [r['threads'] for r in breakdown_data]
@@ -112,9 +114,9 @@ print(f"  Saved: {PLOTS_DIR / 'breakdown_stacked.png'}\n")
 plt.close()
 
 # ============================================================================
-# Graph 2: Line Graph - Each Phase Scaling with Thread Count (10M intervals)
+# Graph 2: Line Graph - Each Phase Scaling with Thread Count (largest size)
 # ============================================================================
-print("Graph 2: Phase Scaling with Thread Count (n=10M)...")
+print(f"Graph 2: Phase Scaling with Thread Count (n={n_focus:,})...")
 
 fig, ax = plt.subplots(figsize=(12, 7))
 
@@ -150,7 +152,7 @@ plt.close()
 # ============================================================================
 # Graph 3: Percentage Breakdown (Normalized to 100%)
 # ============================================================================
-print("Graph 3: Percentage Breakdown by Thread Count (n=10M)...")
+print(f"Graph 3: Percentage Breakdown by Thread Count (n={n_focus:,})...")
 
 fig, ax = plt.subplots(figsize=(12, 7))
 
@@ -194,7 +196,7 @@ plt.close()
 # ============================================================================
 # Graph 4: Speedup of Each Phase (relative to 1 thread)
 # ============================================================================
-print("Graph 4: Phase Speedup vs Thread Count (n=10M)...")
+print(f"Graph 4: Phase Speedup vs Thread Count (n={n_focus:,})...")
 
 fig, ax = plt.subplots(figsize=(12, 7))
 
@@ -243,7 +245,7 @@ plt.close()
 # Summary Statistics
 # ============================================================================
 print("="*70)
-print("BREAKDOWN ANALYSIS SUMMARY (n=10,000,000)")
+print(f"BREAKDOWN ANALYSIS SUMMARY (n={n_focus:,})")
 print("="*70)
 
 breakdown_data = sorted(get_data(n=n_focus), key=lambda x: x['threads'])
